@@ -2,7 +2,7 @@
 #include "Thread.h"
 #include "Thread_manage.h"
 
-#define THREAD_NUM 10
+#define THREAD_NUM 5
 
 //
 unsigned int  __stdcall ThreadProc(LPVOID pParam)
@@ -20,6 +20,8 @@ Thread_manage::Thread_manage()
     m_dwThreadAllNum = 0;
     m_dwThreadBusyNum = 0;
     AddThreadPool();
+    CallbackP0<Thread_manage> *pC = new CallbackP0<Thread_manage>(this, &Thread_manage::UpdateBusyNum);
+    AddTask(pC);
 }
 
 
@@ -67,6 +69,12 @@ BOOL Thread_manage::CloseThreadManage()
     return 0;
 }
 
+void Thread_manage::getThreadNum(int & nBusyNum, int & nAllNum)
+{
+    nBusyNum = m_dwThreadBusyNum;
+    nAllNum = m_dwThreadAllNum;
+}
+
 BOOL Thread_manage::AddThreadPool()
 {
     for (size_t i = 0; i < THREAD_NUM; i++)
@@ -93,7 +101,8 @@ BOOL Thread_manage::AddThreadPool()
 
 BOOL Thread_manage::ReduceThreadPool()
 {
-    if (m_dwThreadAllNum > THREAD_NUM && (m_dwThreadAllNum - m_dwThreadBusyNum) > THREAD_NUM)
+    m_Mutex.Lock();
+    if (m_dwThreadAllNum > THREAD_NUM && (m_dwThreadAllNum - m_dwThreadBusyNum) >= THREAD_NUM)
     {
         DWORD dwReduceNum = 0;
         DWORD dwReduce[THREAD_NUM];
@@ -103,7 +112,7 @@ BOOL Thread_manage::ReduceThreadPool()
             {
                 dwReduce[dwReduceNum] = iter->first;
                 dwReduceNum++;
-                if (dwReduceNum == THREAD_NUM) { break; }
+                if (dwReduceNum == THREAD_NUM) { m_dwThreadAllNum -= THREAD_NUM; break; }
             }
         }
         for (size_t i = 0; i < THREAD_NUM; i++)
@@ -111,17 +120,42 @@ BOOL Thread_manage::ReduceThreadPool()
             m_mapThread.erase(dwReduce[i]);
         }
     }
+    m_Mutex.UnLock();
+    return 0;
+}
+
+DWORD Thread_manage::UpdateBusyNum()
+{
+    while (1)
+    {
+        Sleep(1);
+        DWORD dwNum = 0;
+        m_Mutex.Lock();
+        ReduceThreadPool();
+        for (std::map<DWORD, Thread*>::iterator iter = m_mapThread.begin(); iter != m_mapThread.end(); iter++)
+        {
+            if (iter->second->IsBusy())
+            {
+                dwNum++;
+            }
+        }
+        m_dwThreadBusyNum = dwNum;
+        m_Mutex.UnLock();
+    }
     return 0;
 }
 
 Thread * Thread_manage::FindThread()
 {
+    m_Mutex.Lock();
     for (std::map<DWORD, Thread*>::iterator iter = m_mapThread.begin(); iter != m_mapThread.end(); iter++)
     {
         if (!iter->second->IsBusy())
         {
+            m_Mutex.UnLock();
             return iter->second;
         }
     }
+    m_Mutex.UnLock();
     return NULL;
 }

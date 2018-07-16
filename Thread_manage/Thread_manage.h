@@ -1,6 +1,7 @@
 #pragma once
 #include "stdafx.h"
 #include "mutex.h"
+#include "Thread.h"
 
 class Thread_manage
 {
@@ -11,9 +12,12 @@ public:
     DWORD AddTask(CallbackBase* pTask);
     void setThreadFree(DWORD dwID);
     BOOL CloseThreadManage();
+
+    void getThreadNum(int &nBusyNum, int &nAllNum);
 private:
     BOOL AddThreadPool();
     BOOL ReduceThreadPool();
+    DWORD UpdateBusyNum();
     Thread* FindThread();
 
     DWORD m_dwThreadID;

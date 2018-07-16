@@ -78,6 +78,7 @@ public:
     {
         while (1)
         {
+            Sleep(1);
             if (NULL != m_pNextTask)
             {
                 m_pNextTask->Run();
